@@ -1,16 +1,12 @@
 #include "Arduino.h"
-
 #include "LoRa_E32.h"
-//#include <SPI.h>
+#include <EEPROM.h>
 
-//
 #include "sleep.h"
 #include "Battery_monitor.h"
 
-// Pin 2-8 is connected to the 7 segments of the display.
-
-
-
+int eeAddress = 0; //eeprom address 
+ 
 //7 SEGMENT DISPLAY
 #define pinA PB9
 #define pinB PB10
@@ -86,6 +82,19 @@ void setup() {
   Serial.print("Node ");
   Serial.print(MYNODEID, DEC);
   Serial.println(" ready");
+
+  //EEPROM
+    int Evalue = 0;
+    EEPROM.get(eeAddress, Evalue);
+    if (!(Evalue == Evalue))
+    {
+      //there is no data on that location so we save some data
+      EEPROM.put( eeAddress, NETWORKID);
+    }
+    else{
+      NETWORKID = Evalue;
+      }
+  //
   //BEGIN LOAR E32
   e32ttl100.begin();
   ///////////////
@@ -243,6 +252,8 @@ void loop() {
       //radio.setHighPower(); // Always use this for RFM69HCW
       sevensegment(NETWORKID);
       updateLoraParameters(NETWORKID); //UPDATE THE CHANNEL BY RECONFIGURING THE LORA
+      //save to EEPROM The current channel- when we wakeup this wll be the channel we use
+       EEPROM.put( eeAddress, NETWORKID);
       delay(500);
       s = 0; // listen to button press once more
       break;
