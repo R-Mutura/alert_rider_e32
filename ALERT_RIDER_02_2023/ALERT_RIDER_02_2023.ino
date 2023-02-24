@@ -4,17 +4,13 @@
 //#include <SPI.h>
 
 //
+#include "sleep.h"
 #include "Battery_monitor.h"
 
 // Pin 2-8 is connected to the 7 segments of the display.
 
 
-//BUTTONS
-#define BUTTONPIN1 PA4
-#define BUTTONPIN2 PA3
-#define BUTTONPIN3 PA2
-#define BUTTONPIN4 PA1
-//END
+
 //7 SEGMENT DISPLAY
 #define pinA PB9
 #define pinB PB10
@@ -38,7 +34,7 @@
 //END
 
 //LORA DECLERATIONS
-//HardwareSerial Serial1(USART1);   // PA9  (RX)  PA10  (TX)
+HardwareSerial Serial1(PA10, PA9);   // PA9(TX)    PA10 (RX)   Serial1 (PA10/PA9).
 LoRa_E32 e32ttl100(&Serial1, lora_AUX, lora_M0, lora_M1);
 
 //#define FREQUENCY_433
@@ -113,7 +109,7 @@ void setup() {
   //END
   sevensegment(0);
   initBatPins();
-
+  init_low_power();
 
 }
 
@@ -167,6 +163,12 @@ void loop() {
       {
         s = 2;
       }
+      //in s = 0 check if there is any flag that has been set => then see if we can go to sleep
+        if(s==0 && receiveFlag == 0)//if after all the checks s==0 then we can go to sleep-- else we continue with normal execution
+        {
+          PCBsleep();
+        }
+        
       break;
     case 1: //  sending alarm state
       Serial.println("state 1");
@@ -223,7 +225,7 @@ void loop() {
         if(rs.code != 1)
         {
           do{
-            Serial1.println("Sending data waiting for success");
+            Serial.println("Sending data waiting for success");
              ResponseStatus rs = e32ttl100.sendBroadcastFixedMessage(channels[channel_selected], sendBuffer);
         	   Serial.println(rs.getResponseDescription());
              Serial.println(rs.code);// 1 if Success
@@ -314,7 +316,7 @@ void loop() {
         if(rs.code != 1)
         {
           do{
-            Serial1.println("Sending data waiting for success");
+            Serial.println("Sending data waiting for success");
              ResponseStatus rs = e32ttl100.sendBroadcastFixedMessage(channels[channel_selected], sendBuffer);
         	   Serial.println(rs.getResponseDescription());
              Serial.println(rs.code);// 1 if Success
@@ -514,4 +516,50 @@ void printParameters(struct Configuration configuration) {
 
 	Serial.println("----------------------------------------");
 
+}
+
+void wakeupFromSleep1()
+{
+  //button1 pressed
+  //we add the necessary parameters
+  state = 0;
+  s = 1;
+  sendFlag = 1;
+}
+void wakeupFromSleep2()
+{
+  //button1 pressed
+  //we add the necessary parameters
+  state = 1;
+  s = 1;
+  sendFlag = 1;
+}
+void wakeupFromSleep3()
+{
+  //button1 pressed
+  //we add the necessary parameters
+  state = 2;
+  s = 1;
+  sendFlag = 1;
+}
+void wakeupFromSleep4()
+{
+  //button1 pressed
+  //we add the necessary parameters
+   s = 2;
+}
+void loraWakeup()
+{
+  receiveFlag = 1;//there is data from lora
+}
+
+void PCBsleep(){
+  //setup all the interrupts
+     LowPower.attachInterruptWakeup( int(BUTTONPIN1), wakeupFromSleep1, FALLING, SLEEP_MODE);
+     LowPower.attachInterruptWakeup( int(BUTTONPIN2), wakeupFromSleep2, FALLING, SLEEP_MODE);
+     LowPower.attachInterruptWakeup( int(BUTTONPIN3), wakeupFromSleep3, FALLING, SLEEP_MODE);
+     LowPower.attachInterruptWakeup( int(BUTTONPIN4), wakeupFromSleep4, FALLING, SLEEP_MODE);
+     LowPower.attachInterruptWakeup( int(lora_AUX),   loraWakeup, FALLING, SLEEP_MODE);//receiveFlag is set to 1 here
+
+      LowPower.sleep();
 }

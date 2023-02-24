@@ -65,7 +65,7 @@ void batMonitor()
       long timer = millis();
           if(battery_level == 0)
           {
-            while(millis()-timer < 2000)//for 2 seconds 
+            while(millis()-timer < 2500)//for 2 seconds 
             {
             //battery low (device blinks red for 2 seconds and does not work)
              strip.setPixelColor(1, strip.Color(255, 0, 0));
@@ -76,6 +76,7 @@ void batMonitor()
              strip.show();
              delay(500);
             }
+            PCBshutdown();
           }
           else{
             //blink green... battery is all good
