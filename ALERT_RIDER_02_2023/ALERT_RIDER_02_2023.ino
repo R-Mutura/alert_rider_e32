@@ -1,11 +1,14 @@
 #include "Arduino.h"
-#include <Adafruit_NeoPixel.h>
+
 #include "LoRa_E32.h"
 //#include <SPI.h>
 
+//
+#include "Battery_monitor.h"
+
 // Pin 2-8 is connected to the 7 segments of the display.
-#define LEDPIN PA5//ADDRESSABLE LED
-#define LEDCOUNT 3
+
+
 //BUTTONS
 #define BUTTONPIN1 PA4
 #define BUTTONPIN2 PA3
@@ -21,6 +24,11 @@
 #define pinF PB14
 #define pinG PB15
 //END
+//leds
+#define RED_LED PB8
+#define YLW_LED PB7
+#define GRN_LED PB6
+//end
 //LORA MODULE EBYTE PINS
 #define lora_TX PA9  //ADD INTERNAL PULLUP 
 #define lora_RX PA10 //ADD INTERNAL PULLUP 
@@ -49,17 +57,16 @@ char sendBuffer[2] = "";
 uint8_t sendFlag = 0;
 
 //channels  arrat   { 0     1    2    3    4    5    6    7    8    9  }
+uint8_t NETWORKID = 0;  // Must be the same for all nodes
 uint8_t channels[] ={ 0x02,0x04,0X06,0x08,0x0A,0x0B,0x0C,0x0E,0x0F,0x10 };
-int channel_selected = 0;
-
-Adafruit_NeoPixel strip(LEDCOUNT, LEDPIN, NEO_RGB + NEO_KHZ800);
+int channel_selected = NETWORKID;
 
 // Addresses for this node. CHANGE THESE FOR EACH NODE!
 
-uint8_t NETWORKID = 0;  // Must be the same for all nodes
+
 char    MYNODEID  = 1;   // My node ID
 #define TONODEID    255   // Destination node ID
-#define FREQUENCY     RF69_868MHZ
+#define FREQUENCY   RF69_868MHZ
 // AES encryption (or not):
 
 #define ENCRYPT       false // Set to "true" to use encryption
@@ -99,37 +106,62 @@ void setup() {
   pinMode(BUTTONPIN2, INPUT_PULLUP);
   pinMode(BUTTONPIN3, INPUT_PULLUP);
   pinMode(BUTTONPIN4, INPUT_PULLUP);
+  //LEDS INIT
+  pinMode(RED_LED, OUTPUT);
+  pinMode(YLW_LED, OUTPUT);
+  pinMode(GRN_LED, OUTPUT);
+  //END
   sevensegment(0);
-  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+  initBatPins();
 
 
 }
 
 // the loop routine runs over and over again forever:
 void loop() {
+  batMonitor();
   switch (s)
   {
     Serial.println("state 0");
     case 0: //listening to button press
       if (!digitalRead(BUTTONPIN1))
       {
-        state = 0;
-        s = 1;
-        sendFlag = 1;
+        if(s == 0){
+            state = 0;
+            s = 1;
+            sendFlag = 1;
+        }
+        else{// s == 1
+            state = 10;
+            s = 0;
+            sendFlag = 0;
+          }
       }
       else if (!digitalRead(BUTTONPIN2))
       {
-        state = 1;
-        s = 1;
-        sendFlag = 1;
+         if(s == 0) {  
+            state = 1;
+            s = 1;
+            sendFlag = 1;
+         }
+         else{
+            state = 10;
+            s = 0;
+            sendFlag = 0;
+          }
       }
       else if (!digitalRead(BUTTONPIN3))
       {
-        state = 2;
-        s = 1;
-        sendFlag = 1;
+        if(s == 0){
+            state = 2;
+            s = 1;
+            sendFlag = 1;
+        }
+      else{
+            state = 10;
+            s = 0;
+            sendFlag = 0;
+          }
       }
       else if (!digitalRead(BUTTONPIN4))
       {
@@ -141,27 +173,39 @@ void loop() {
       switch (state)
       {
         case 0:
-          strip.setPixelColor(0, strip.Color(255,   0,   0));
+          /*strip.setPixelColor(0, strip.Color(255,   0,   0));
           strip.show();
           delay(500);
           strip.setPixelColor(0, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          digitalWrite(RED_LED, HIGH);
+          delay(500);
+          digitalWrite(RED_LED, LOW);
           delay(500);
           break;
         case 1:
-          strip.setPixelColor(1, strip.Color(0,   255,   0));
+          /*strip.setPixelColor(1, strip.Color(0,   255,   0));
           strip.show();
           delay(500);
           strip.setPixelColor(1, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          digitalWrite(YLW_LED, HIGH);
+          delay(500);
+          digitalWrite(YLW_LED, LOW);
           delay(500);
           break;
         case 2:
-          strip.setPixelColor(2, strip.Color(0,   0,   255));
+          /*strip.setPixelColor(2, strip.Color(0,   0,   255));
           strip.show();
           delay(500);
           strip.setPixelColor(2, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          digitalWrite(GRN_LED, HIGH);
+          delay(500);
+          digitalWrite(GRN_LED, LOW);
           delay(500);
           break;
       }
@@ -185,8 +229,8 @@ void loop() {
              Serial.println(rs.code);// 1 if Success
           }while(rs.code != 1 );
       }
-        Serial.println("ACK received");
-        sendFlag = 0;
+          Serial.println("ACK received");
+          sendFlag = 0;
       }
       break;
       
@@ -196,6 +240,7 @@ void loop() {
       //radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
       //radio.setHighPower(); // Always use this for RFM69HCW
       sevensegment(NETWORKID);
+      updateLoraParameters(NETWORKID); //UPDATE THE CHANNEL BY RECONFIGURING THE LORA
       delay(500);
       s = 0; // listen to button press once more
       break;
@@ -205,28 +250,42 @@ void loop() {
       switch (state)
       {
         case 0:
-          strip.setPixelColor(0, strip.Color(255,   0,   0));
+        /*  strip.setPixelColor(0, strip.Color(255,   0,   0));
           strip.show();
           delay(500);
           strip.setPixelColor(0, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          //BLINK RED
+          digitalWrite(RED_LED, HIGH);
           delay(500);
+          digitalWrite(RED_LED, LOW);
+          delay(500);          
           break;
         case 1:
-          strip.setPixelColor(1, strip.Color(0,   255,   0));
+         /* strip.setPixelColor(1, strip.Color(0,   255,   0));
           strip.show();
           delay(500);
           strip.setPixelColor(1, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          
+          digitalWrite(YLW_LED, HIGH);
           delay(500);
-          break;
+          digitalWrite(YLW_LED, LOW);
+          delay(500); 
+          break;  
         case 2:
-          strip.setPixelColor(2, strip.Color(0,   0,   255));
+          /*strip.setPixelColor(2, strip.Color(0,   0,   255));
           strip.show();
           delay(500);
           strip.setPixelColor(2, strip.Color(0,   0,   0));
           strip.show();
+          delay(500);*/
+          digitalWrite(GRN_LED, HIGH);
           delay(500);
+          digitalWrite(GRN_LED, LOW);
+          delay(500);   
           break;
       }
       
@@ -285,7 +344,7 @@ void loop() {
     // The actual message is contained in the DATA array,
     // and is DATALEN bytes in size:
 
-    if (s == 1 && message.indexOf("C") > 0) // sending alarm state
+    if (s == 1 && message.indexOf("C") > 0) // RECEIVED AN ACK OF THE ALARM
     {
       if (message.indexOf(state) > 0)
       {
@@ -294,9 +353,9 @@ void loop() {
         s = 0; //go back to listen to button press
       }
     }
-    else if (s == 0 && message.indexOf("A") > 0) // listening to button presses
+    else if (s == 0 && message.indexOf("A") > 0) // listening TO RECEIVED ALARMS VIA LORA
     {
-      if (message.indexOf("0")>0 || message.indexOf("2")>0 || message.indexOf("2")>0 ) // incoming data is valid alarm
+      if (message.indexOf("0")>0 || message.indexOf("1")>0 || message.indexOf("2")>0 ) // incoming data is valid alarm
       {
         Serial.print("State is now: ");
         if(message.indexOf("0")>0) state =0;
@@ -318,22 +377,22 @@ void sevensegment(uint8_t num)
   switch (num)
   {
     case 0:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
-      digitalWrite(pinD, HIGH);
-      digitalWrite(pinE, HIGH);
-      digitalWrite(pinF, HIGH);
-      digitalWrite(pinG, LOW);
-      break;
-    case 1:
       digitalWrite(pinA, LOW);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
       digitalWrite(pinD, LOW);
       digitalWrite(pinE, LOW);
       digitalWrite(pinF, LOW);
-      digitalWrite(pinG, LOW);
+      digitalWrite(pinG, HIGH);
+      break;
+    case 1:
+      digitalWrite(pinA, HIGH);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
+      digitalWrite(pinD, HIGH);
+      digitalWrite(pinE, HIGH);
+      digitalWrite(pinF, HIGH);
+      digitalWrite(pinG, HIGH);
       break;
     case 2:
       digitalWrite(pinA, HIGH);
@@ -345,75 +404,71 @@ void sevensegment(uint8_t num)
       digitalWrite(pinG, HIGH);
       break;
     case 3:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
-      digitalWrite(pinD, HIGH);
-      digitalWrite(pinE, LOW);
-      digitalWrite(pinF, LOW);
-      digitalWrite(pinG, HIGH);
-      break;
-    case 4:
       digitalWrite(pinA, LOW);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
       digitalWrite(pinD, LOW);
-      digitalWrite(pinE, LOW);
-      digitalWrite(pinF, HIGH);
-      digitalWrite(pinG, HIGH);
-      break;
-    case 5:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, LOW);
-      digitalWrite(pinC, HIGH);
-      digitalWrite(pinD, HIGH);
-      digitalWrite(pinE, LOW);
-      digitalWrite(pinF, HIGH);
-      digitalWrite(pinG, HIGH);
-      break;
-    case 6:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, LOW);
-      digitalWrite(pinC, HIGH);
-      digitalWrite(pinD, HIGH);
       digitalWrite(pinE, HIGH);
       digitalWrite(pinF, HIGH);
-      digitalWrite(pinG, HIGH);
+      digitalWrite(pinG, LOW);
       break;
-    case 7:
+    case 4:
       digitalWrite(pinA, HIGH);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
+      digitalWrite(pinD, HIGH);
+      digitalWrite(pinE, HIGH);
+      digitalWrite(pinF, LOW);
+      digitalWrite(pinG, LOW);
+      break;
+    case 5:
+      digitalWrite(pinA, LOW);
       digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
+      digitalWrite(pinC, LOW);
+      digitalWrite(pinD, LOW);
+      digitalWrite(pinE, HIGH);
+      digitalWrite(pinF, LOW);
+      digitalWrite(pinG, LOW);
+      break;
+    case 6:
+      digitalWrite(pinA, LOW);
+      digitalWrite(pinB, HIGH);
+      digitalWrite(pinC, LOW);
       digitalWrite(pinD, LOW);
       digitalWrite(pinE, LOW);
       digitalWrite(pinF, LOW);
       digitalWrite(pinG, LOW);
       break;
-    case 8:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
+    case 7:
+      digitalWrite(pinA, LOW);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
       digitalWrite(pinD, HIGH);
       digitalWrite(pinE, HIGH);
       digitalWrite(pinF, HIGH);
       digitalWrite(pinG, HIGH);
       break;
-    case 9:
-      digitalWrite(pinA, HIGH);
-      digitalWrite(pinB, HIGH);
-      digitalWrite(pinC, HIGH);
-      digitalWrite(pinD, HIGH);
+    case 8:
+      digitalWrite(pinA, LOW);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
+      digitalWrite(pinD, LOW);
       digitalWrite(pinE, LOW);
-      digitalWrite(pinF, HIGH);
-      digitalWrite(pinG, HIGH);
+      digitalWrite(pinF, LOW);
+      digitalWrite(pinG, LOW);
+      break;
+    case 9:
+      digitalWrite(pinA, LOW);
+      digitalWrite(pinB, LOW);
+      digitalWrite(pinC, LOW);
+      digitalWrite(pinD, LOW);
+      digitalWrite(pinE, HIGH);
+      digitalWrite(pinF, LOW);
+      digitalWrite(pinG, LOW);
       break;
   }
 }
 
-void colorWipe(uint32_t color, int wait)
-{
-
-}
 void updateLoraParameters(int channel_selected)
 {
   
