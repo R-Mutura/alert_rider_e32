@@ -86,7 +86,7 @@ void setup() {
   //EEPROM
     int Evalue = 0;
     EEPROM.get(eeAddress, Evalue);
-    if (!(Evalue == Evalue))
+    if (!(Evalue == Evalue))//check if the value is NAN
     {
       //there is no data on that location so we save some data
       EEPROM.put( eeAddress, NETWORKID);
@@ -131,42 +131,25 @@ void loop() {
     case 0: //listening to button press
       if (!digitalRead(BUTTONPIN1))
       {
-        if(s == 0){
             state = 0;
             s = 1;
             sendFlag = 1;
-        }
-        else{// s == 1
-            state = 10;
-            s = 0;
-            sendFlag = 0;
-          }
       }
       else if (!digitalRead(BUTTONPIN2))
       {
-         if(s == 0) {  
+        
             state = 1;
             s = 1;
             sendFlag = 1;
-         }
-         else{
-            state = 10;
-            s = 0;
-            sendFlag = 0;
-          }
+        
       }
       else if (!digitalRead(BUTTONPIN3))
       {
-        if(s == 0){
+        
             state = 2;
             s = 1;
             sendFlag = 1;
-        }
-      else{
-            state = 10;
-            s = 0;
-            sendFlag = 0;
-          }
+       
       }
       else if (!digitalRead(BUTTONPIN4))
       {
@@ -220,7 +203,29 @@ void loop() {
           delay(500);
           break;
       }
-
+      //check if there is a second button press to revert the state
+                   if (!digitalRead(BUTTONPIN1))
+                {
+                      state = 10;
+                      s = 0;
+                      sendFlag = 0;
+                }
+                else if (!digitalRead(BUTTONPIN2))
+                {
+                  
+                      state = 10;
+                      s = 0;
+                      sendFlag = 0;
+                  
+                }
+                else if (!digitalRead(BUTTONPIN3))
+                {
+                  
+                      state = 10;
+                      s = 0;
+                      sendFlag = 0;
+                 
+                }
       // Send data
       if (sendFlag)
       {
